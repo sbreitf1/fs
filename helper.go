@@ -2,7 +2,9 @@ package fs
 
 import (
 	"io"
+	"io/ioutil"
 	"os"
+	"strings"
 )
 
 // Exists returns true, if the given path is a file or directory.
@@ -69,4 +71,15 @@ func CopyFile(src, dst string) error {
 // CopyDir recursively clones a directory overwriting all existing files.
 func CopyDir(src, dst string) error {
 	panic("CopyDir not implemented yet")
+}
+
+// ReadLines returns all lines separated by \n from a file.
+func ReadLines(file string) ([]string, error) {
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(string(data), "\n")
+	return lines, nil
 }

@@ -67,3 +67,9 @@ func TestCopyFile(t *testing.T) {
 		return nil
 	}))
 }
+
+func TestReadLines(t *testing.T) {
+	lines, err := ReadLines("test/lines-test.txt")
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"this", "is", "", "a new line with spaces", ""}, lines)
+}
