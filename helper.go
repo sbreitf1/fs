@@ -2,46 +2,8 @@ package fs
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
-	"strings"
 )
-
-// Exists returns true, if the given path is a file or directory.
-func Exists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, nil
-	}
-	return true, nil
-}
-
-// IsFile returns true, if the given path is a file.
-func IsFile(path string) (bool, error) {
-	fi, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, nil
-	}
-	return !fi.IsDir(), nil
-}
-
-// IsDir returns true, if the given path is a directory.
-func IsDir(path string) (bool, error) {
-	fi, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, nil
-	}
-	return fi.IsDir(), nil
-}
 
 // Copy clone a file or directory to the target. If the target already exists, it must be the same element type (file or directory) to be overwritten.
 func Copy(src, dst string) error {
@@ -71,15 +33,4 @@ func CopyFile(src, dst string) error {
 // CopyDir recursively clones a directory overwriting all existing files.
 func CopyDir(src, dst string) error {
 	panic("CopyDir not implemented yet")
-}
-
-// ReadLines returns all lines separated by \n from a file.
-func ReadLines(file string) ([]string, error) {
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-
-	lines := strings.Split(string(data), "\n")
-	return lines, nil
 }

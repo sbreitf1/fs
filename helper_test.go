@@ -60,8 +60,8 @@ func TestCopyFile(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, exists)
 
-		data, err := ioutil.ReadFile(newFile)
-		assert.NoError(t, err)
+		data, readErr := ioutil.ReadFile(newFile)
+		assert.NoError(t, readErr)
 		assert.Equal(t, expectedData, data)
 
 		return nil
