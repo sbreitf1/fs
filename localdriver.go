@@ -62,3 +62,11 @@ func (d *LocalDriver) Open(path string) (File, errors.Error) {
 func (d *LocalDriver) GetTempFile(prefix string) (string, errors.Error) {
 	return "", ErrNotSupported.Args("GetTempFile").Make()
 }
+
+func (d *LocalDriver) Create(path string) (File, errors.Error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, errors.Wrap(err).Expand("Could not create file")
+	}
+	return f, nil
+}
