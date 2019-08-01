@@ -6,8 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/sbreitf1/errors"
 	"github.com/stretchr/testify/assert"
 )
+
+//TODO move to file system tests
 
 func TestExistsDir(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "fs-test-")
@@ -44,7 +47,7 @@ func TestExistsFile(t *testing.T) {
 }
 
 func TestCopyFile(t *testing.T) {
-	assert.NoError(t, WithTempDir("fs-test-", func(tmpDir string) error {
+	assert.NoError(t, WithTempDir("fs-test-", func(tmpDir string) errors.Error {
 		expectedData := []byte("this is a test")
 
 		oldFile := filepath.Join(tmpDir, "test.txt")

@@ -6,7 +6,7 @@ import (
 
 var (
 	// DefaultFileSystem denots the file system used for all default accessors.
-	DefaultFileSystem *Util
+	DefaultFileSystem *FileSystem
 )
 
 func init() {
@@ -36,4 +36,29 @@ func ReadLines(path string) ([]string, errors.Error) {
 // WriteLines writes all lines separated by the default line separator to a file.
 func WriteLines(path string, lines []string) errors.Error {
 	return DefaultFileSystem.WriteLines(path, lines)
+}
+
+// Copy clone a file or directory to the target. If the target already exists, it must be the same element type (file or directory) to be overwritten.
+func Copy(src, dst string) errors.Error {
+	panic("Copy not implemented yet")
+}
+
+// CopyFile clones a file and overwrites the existing one.
+func CopyFile(src, dst string) errors.Error {
+	return DefaultFileSystem.CopyFile(src, dst)
+}
+
+// CopyDir recursively clones a directory overwriting all existing files.
+func CopyDir(src, dst string) errors.Error {
+	panic("CopyDir not implemented yet")
+}
+
+// WithTempFile creates a temporary file and deletes it when f returns.
+func WithTempFile(pattern string, f func(tmpFile string) errors.Error) errors.Error {
+	return DefaultFileSystem.WithTempFile(pattern, f)
+}
+
+// WithTempDir creates a temporary directory and deletes it when f returns.
+func WithTempDir(prefix string, f func(tmpDir string) errors.Error) errors.Error {
+	return DefaultFileSystem.WithTempDir(prefix, f)
 }

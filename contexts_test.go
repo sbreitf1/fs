@@ -3,12 +3,14 @@ package fs
 import (
 	"testing"
 
+	"github.com/sbreitf1/errors"
 	"github.com/stretchr/testify/assert"
 )
 
+//TODO move to file system tests
 func TestWithTempDir(t *testing.T) {
 	var dir string
-	assert.NoError(t, WithTempDir("fs-test-", func(tmpDir string) error {
+	assert.NoError(t, WithTempDir("fs-test-", func(tmpDir string) errors.Error {
 		dir = tmpDir
 
 		exists, err := IsDir(dir)
@@ -28,7 +30,7 @@ func TestWithTempDir(t *testing.T) {
 
 func TestWithTempFile(t *testing.T) {
 	var file string
-	assert.NoError(t, WithTempFile("fs-test-", func(tmpFile string) error {
+	assert.NoError(t, WithTempFile("fs-test-", func(tmpFile string) errors.Error {
 		file = tmpFile
 
 		exists, err := IsFile(file)
