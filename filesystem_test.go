@@ -3,10 +3,10 @@ package fs
 import (
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/sbreitf1/errors"
+	"github.com/sbreitf1/fs/path"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,7 +24,7 @@ func TestNewUtilInvalid(t *testing.T) {
 	assert.Panics(t, func() { NewWithDriver("not a file system driver") })
 }
 
-func TestFileSystemFunctionality(t *testing.T) {
+func TestFileSystemCommon(t *testing.T) {
 	fs := New()
 	errors.AssertNil(t, WithTempDir("fs-test-", func(tmpDir string) errors.Error {
 		testFS(t, fs, tmpDir)
@@ -34,7 +34,7 @@ func TestFileSystemFunctionality(t *testing.T) {
 
 func testFS(t *testing.T, fs *FileSystem, tmpDir string) {
 	t.Run("TestReadString", func(t *testing.T) {
-		path := filepath.Join(tmpDir, "test.txt")
+		path := path.Join(tmpDir, "test.txt")
 		if err := ioutil.WriteFile(path, []byte("a new cool file content"), os.ModePerm); err != nil {
 			panic(err)
 		}
@@ -44,7 +44,7 @@ func testFS(t *testing.T, fs *FileSystem, tmpDir string) {
 	})
 
 	t.Run("TestWriteLines", func(t *testing.T) {
-		path := filepath.Join(tmpDir, "test.txt")
+		path := path.Join(tmpDir, "test.txt")
 		errors.AssertNil(t, fs.WriteLines(path, []string{"foo", "bar", "", "yeah!", ""}))
 		assert.FileExists(t, path)
 		data, err := fs.ReadString(path)
