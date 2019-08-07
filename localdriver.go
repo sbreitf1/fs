@@ -3,10 +3,10 @@ package fs
 import (
 	"io/ioutil"
 	"os"
-	"strings"
+
+	"github.com/sbreitf1/fs/path"
 
 	"github.com/sbreitf1/errors"
-	"github.com/sbreitf1/fs/path"
 )
 
 // LocalDriver allows access to the file system of the host machine.
@@ -14,30 +14,26 @@ type LocalDriver struct {
 	Root string
 }
 
-func (d *LocalDriver) root(p string) string {
+func (d *LocalDriver) root(p string) (string, errors.Error) {
 	if len(d.Root) == 0 {
-		return p
+		return p, nil
 	}
-	// error can only occur for inaccessible working directory -> ignore here
-	abs, _ := path.Abs(p)
-	return path.Join(d.Root, abs)
-}
-
-func (d *LocalDriver) unroot(p string) string {
-	if len(d.Root) == 0 {
-		return p
+	if !path.IsAbs(p) {
+		return "", ErrInvalidPath.Msg("Relative paths are not allowed on rooted local file systems").Make()
 	}
-	if strings.HasPrefix(p, d.Root) {
-		return p[len(d.Root):]
-	}
-	return p
+	return path.AbsRoot(d.Root, p)
 }
 
 // Exists returns true, if the given path is a file or directory.
 func (d *LocalDriver) Exists(path string) (bool, errors.Error) {
-	_, err := os.Stat(d.root(path))
+	rootedPath, err := d.root(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		return false, err
+	}
+
+	_, statErr := os.Stat(rootedPath)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
 			return false, nil
 		}
 		return false, nil
@@ -47,9 +43,14 @@ func (d *LocalDriver) Exists(path string) (bool, errors.Error) {
 
 // IsFile returns true, if the given path is a file.
 func (d *LocalDriver) IsFile(path string) (bool, errors.Error) {
-	fi, err := os.Stat(d.root(path))
+	rootedPath, err := d.root(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		return false, err
+	}
+
+	fi, statErr := os.Stat(rootedPath)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
 			return false, nil
 		}
 		return false, nil
@@ -59,9 +60,14 @@ func (d *LocalDriver) IsFile(path string) (bool, errors.Error) {
 
 // IsDir returns true, if the given path is a directory.
 func (d *LocalDriver) IsDir(path string) (bool, errors.Error) {
-	fi, err := os.Stat(d.root(path))
+	rootedPath, err := d.root(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		return false, err
+	}
+
+	fi, statErr := os.Stat(rootedPath)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
 			return false, nil
 		}
 		return false, nil
@@ -71,9 +77,14 @@ func (d *LocalDriver) IsDir(path string) (bool, errors.Error) {
 
 // ReadDir returns all files and directories contained in a directory.
 func (d *LocalDriver) ReadDir(path string) ([]FileInfo, errors.Error) {
-	items, err := ioutil.ReadDir(d.root(path))
+	rootedPath, err := d.root(path)
 	if err != nil {
-		return nil, ErrFileSystem.Msg("Failed to list directory content").Make().Cause(err)
+		return nil, err
+	}
+
+	items, readErr := ioutil.ReadDir(rootedPath)
+	if readErr != nil {
+		return nil, ErrFileSystem.Msg("Failed to list directory content").Make().Cause(readErr)
 	}
 
 	result := make([]FileInfo, len(items))
@@ -85,28 +96,43 @@ func (d *LocalDriver) ReadDir(path string) ([]FileInfo, errors.Error) {
 
 // OpenFile opens a file instance and returns the handle.
 func (d *LocalDriver) OpenFile(path string) (File, errors.Error) {
-	f, err := os.Open(d.root(path))
+	rootedPath, err := d.root(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		return nil, err
+	}
+
+	f, openErr := os.Open(rootedPath)
+	if openErr != nil {
+		if os.IsNotExist(openErr) {
 			return nil, ErrFileNotExists.Args(path).Make()
 		}
-		return nil, ErrFileSystem.Msg("Could not open file").Make().Cause(err)
+		return nil, ErrFileSystem.Msg("Could not open file").Make().Cause(openErr)
 	}
 	return f, nil
 }
 
 // CreateFile a new file (or truncate an existing) and return the file instance handle.
 func (d *LocalDriver) CreateFile(path string) (File, errors.Error) {
-	f, err := os.Create(d.root(path))
+	rootedPath, err := d.root(path)
 	if err != nil {
-		return nil, ErrFileSystem.Msg("Could not create file").Make().Cause(err)
+		return nil, err
+	}
+
+	f, createErr := os.Create(rootedPath)
+	if createErr != nil {
+		return nil, ErrFileSystem.Msg("Could not create file").Make().Cause(createErr)
 	}
 	return f, nil
 }
 
 // DeleteFile deletes a file.
 func (d *LocalDriver) DeleteFile(path string) errors.Error {
-	if err := errors.Wrap(os.Remove(d.root(path))); err != nil {
+	rootedPath, err := d.root(path)
+	if err != nil {
+		return err
+	}
+
+	if err := errors.Wrap(os.Remove(rootedPath)); err != nil {
 		if os.IsNotExist(err) {
 			return ErrFileNotExists.Args(path).Make()
 		}
@@ -117,11 +143,15 @@ func (d *LocalDriver) DeleteFile(path string) errors.Error {
 
 // DeleteDirectory deletes an empty directory. Set recursive to true to also remove directory content.
 func (d *LocalDriver) DeleteDirectory(path string, recursive bool) errors.Error {
-	var err errors.Error
+	rootedPath, err := d.root(path)
+	if err != nil {
+		return err
+	}
+
 	if recursive {
-		err = errors.Wrap(os.RemoveAll(d.root(path)))
+		err = errors.Wrap(os.RemoveAll(rootedPath))
 	} else {
-		err = errors.Wrap(os.Remove(d.root(path)))
+		err = errors.Wrap(os.Remove(rootedPath))
 	}
 
 	if err != nil {
@@ -135,7 +165,16 @@ func (d *LocalDriver) DeleteDirectory(path string, recursive bool) errors.Error 
 
 // MoveFile moves a file to a new location.
 func (d *LocalDriver) MoveFile(src, dst string) errors.Error {
-	if err := os.Rename(d.root(src), d.root(dst)); err != nil {
+	rootedSrc, err := d.root(src)
+	if err != nil {
+		return err
+	}
+	rootedDst, err := d.root(dst)
+	if err != nil {
+		return err
+	}
+
+	if err := os.Rename(rootedSrc, rootedDst); err != nil {
 		if os.IsNotExist(err) {
 			//TODO check src file or dst dir does not exist
 			return ErrFileNotExists.Args(src).Make()
@@ -147,7 +186,16 @@ func (d *LocalDriver) MoveFile(src, dst string) errors.Error {
 
 // MoveDir moves a directory to a new location.
 func (d *LocalDriver) MoveDir(src, dst string) errors.Error {
-	if err := os.Rename(d.root(src), d.root(dst)); err != nil {
+	rootedSrc, err := d.root(src)
+	if err != nil {
+		return err
+	}
+	rootedDst, err := d.root(dst)
+	if err != nil {
+		return err
+	}
+
+	if err := os.Rename(rootedSrc, rootedDst); err != nil {
 		if os.IsNotExist(err) {
 			//TODO check src file or dst dir does not exist
 			return ErrFileNotExists.Args(src).Make()
@@ -168,7 +216,7 @@ func (d *LocalDriver) GetTempFile(pattern string) (string, errors.Error) {
 		return "", ErrFileSystem.Msg("Failed to create temporary file").Make().Cause(err)
 	}
 	defer tmpFile.Close()
-	return d.unroot(tmpFile.Name()), nil
+	return tmpFile.Name(), nil
 }
 
 // GetTempDir returns the path to an empty temporary dir.
@@ -181,5 +229,5 @@ func (d *LocalDriver) GetTempDir(prefix string) (string, errors.Error) {
 	if err != nil {
 		return "", ErrFileSystem.Msg("Failed to create temporary directory").Make().Cause(err)
 	}
-	return d.unroot(tmpDir), nil
+	return tmpDir, nil
 }

@@ -5,8 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sbreitf1/errors"
 	"github.com/sbreitf1/fs/path"
+
+	"github.com/sbreitf1/errors"
 	"github.com/stretchr/testify/assert"
 )
 
