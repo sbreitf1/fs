@@ -11,6 +11,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestOpenFlags(t *testing.T) {
+	assert.True(t, OpenReadOnly.IsRead())
+	assert.False(t, OpenReadOnly.IsWrite())
+	assert.False(t, OpenWriteOnly.IsRead())
+	assert.True(t, OpenWriteOnly.IsWrite())
+	assert.True(t, OpenReadWrite.IsRead())
+	assert.True(t, OpenReadWrite.IsWrite())
+	assert.False(t, OpenReadOnly.Append().Create().Exclusive().Sync().Truncate().IsWrite())
+	assert.Equal(t, OpenWriteOnly, OpenWriteOnly.Exclusive().Access())
+}
+
 func TestNew(t *testing.T) {
 	var fs *FileSystem
 	assert.NotPanics(t, func() { fs = New() })

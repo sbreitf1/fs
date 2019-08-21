@@ -114,20 +114,6 @@ func (d *LocalDriver) OpenFile(path string, flags OpenFlags) (File, errors.Error
 	return f, nil
 }
 
-// CreateFile creates a new file (or truncates an existing) and returns the file instance handle.
-/*func (d *LocalDriver) CreateFile(path string) (File, errors.Error) {
-	rootedPath, err := d.root(path)
-	if err != nil {
-		return nil, err
-	}
-
-	f, createErr := os.Create(rootedPath)
-	if createErr != nil {
-		return nil, Err.Msg("Could not create file").Make().Cause(createErr)
-	}
-	return f, nil
-}*/
-
 // CreateDirectory creates a new directory and all parent directories if they do not exist.
 func (d *LocalDriver) CreateDirectory(path string) errors.Error {
 	rootedPath, err := d.root(path)

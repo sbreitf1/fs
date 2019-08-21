@@ -94,14 +94,22 @@ const (
 	OpenReadWrite OpenFlags = OpenFlags(os.O_RDWR)
 )
 
+// Access returns only the access flag.
+func (flag OpenFlags) Access() OpenFlags {
+	mask := int(OpenReadOnly) | int(OpenWriteOnly) | int(OpenReadWrite)
+	return OpenFlags(int(flag) & mask)
+}
+
 // IsRead returns whether the given flags require read access.
 func (flag OpenFlags) IsRead() bool {
-	return (int(flag)&os.O_RDONLY) > 0 || (int(flag)&os.O_RDWR) > 0
+	access := flag.Access()
+	return (access == OpenReadOnly || access == OpenReadWrite)
 }
 
 // IsWrite returns whether the given flags require write access.
 func (flag OpenFlags) IsWrite() bool {
-	return (int(flag)&os.O_WRONLY) > 0 || (int(flag)&os.O_RDWR) > 0
+	access := flag.Access()
+	return (access == OpenWriteOnly || access == OpenReadWrite)
 }
 
 // Append opens the file for appending.

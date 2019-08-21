@@ -79,7 +79,6 @@ func testLocalDriver(t *testing.T, driver *LocalDriver, rootDir, workingDir stri
 	})
 
 	t.Run("CreateFile", func(t *testing.T) {
-		//f, err := driver.CreateFile(path.Join(workingDir, "/newdir/and/subdir/testfile.txt"))
 		f, err := driver.OpenFile(path.Join(workingDir, "/newdir/and/subdir/testfile.txt"), OpenReadWrite.Create().Truncate())
 		errors.AssertNil(t, err)
 
