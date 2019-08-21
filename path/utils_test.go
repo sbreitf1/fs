@@ -9,6 +9,10 @@ import (
 )
 
 func TestJoin(t *testing.T) {
+	assert.Equal(t, "", Join(""))
+	assert.Equal(t, "/", Join("/"))
+	assert.Equal(t, "/", Join("", "/"))
+	assert.Equal(t, "/foobar", Join("", "/foobar"))
 	assert.Equal(t, "/bar", Join("", "/bar"))
 	assert.Equal(t, "/foo/bar", Join("/foo", "", "bar"))
 	assert.Equal(t, "/foo/bar", Join("/foo", "/", "bar"))
@@ -117,7 +121,7 @@ func TestAbsIn(t *testing.T) {
 	var err error
 
 	abs, err = AbsIn("var/blub", "test.txt")
-	errors.Assert(t, ErrInvalidPath, err)
+	errors.Assert(t, Err, err)
 
 	abs, err = AbsIn("/var/blub", "")
 	errors.AssertNil(t, err)
@@ -165,7 +169,7 @@ func TestAbsRoot(t *testing.T) {
 	var err error
 
 	abs, err = AbsRoot("var/blub", "test.txt")
-	errors.Assert(t, ErrInvalidPath, err)
+	errors.Assert(t, Err, err)
 
 	abs, err = AbsRoot("/var/blub", "")
 	errors.AssertNil(t, err)
@@ -229,10 +233,10 @@ func TestIsIn(t *testing.T) {
 	assert.False(t, in)
 
 	in, err = IsIn("", "/")
-	errors.Assert(t, ErrInvalidPath, err)
+	errors.Assert(t, Err, err)
 
 	in, err = IsIn("/", "")
-	errors.Assert(t, ErrInvalidPath, err)
+	errors.Assert(t, Err, err)
 }
 
 func TestExt(t *testing.T) {

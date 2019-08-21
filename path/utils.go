@@ -13,8 +13,8 @@ const (
 )
 
 var (
-	// ErrInvalidPath occurs when using malformed paths.
-	ErrInvalidPath = errors.New("Malformed path")
+	// Err occurs when using malformed paths.
+	Err = errors.New("Malformed path")
 )
 
 // Join merges multiple path parts using the DefaultPathDelimiter.
@@ -51,7 +51,7 @@ func IsAbs(path string) bool {
 func Abs(path string) (string, errors.Error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
-		return "", ErrInvalidPath.Make().Cause(err)
+		return "", Err.Make().Cause(err)
 	}
 	return path, nil
 }
@@ -59,7 +59,7 @@ func Abs(path string) (string, errors.Error) {
 // AbsIn returns the absolute path as seen by a given working directory. The working directory is ignored for absolute paths.
 func AbsIn(wd, path string) (string, errors.Error) {
 	if !IsAbs(wd) {
-		return "", ErrInvalidPath.Msg("The working directory must be an absolute path").Make()
+		return "", Err.Msg("The working directory must be an absolute path").Make()
 	}
 
 	if IsAbs(path) {
@@ -71,7 +71,7 @@ func AbsIn(wd, path string) (string, errors.Error) {
 // AbsRoot returns the absolute path and ensures the result to stay in root.
 func AbsRoot(root, path string) (string, errors.Error) {
 	if !IsAbs(root) {
-		return "", ErrInvalidPath.Msg("The root directory must be an absolute path").Make()
+		return "", Err.Msg("The root directory must be an absolute path").Make()
 	}
 
 	abs := Clean(Join(root, Clean(path)))
@@ -87,17 +87,17 @@ func AbsRoot(root, path string) (string, errors.Error) {
 		return abs, nil
 	}
 
-	return "", ErrInvalidPath.Make()
+	return "", Err.Make()
 }
 
 // IsIn returns true when the given path is a (recursive) child of expectedParent. This method can be used for security checks.
 func IsIn(path, expectedParent string) (bool, errors.Error) {
 	if !IsAbs(path) {
-		return false, ErrInvalidPath.Msg("path must denote an absolute path").Make()
+		return false, Err.Msg("path must denote an absolute path").Make()
 	}
 
 	if !IsAbs(expectedParent) {
-		return false, ErrInvalidPath.Msg("expectedParent must denote an absolute path").Make()
+		return false, Err.Msg("expectedParent must denote an absolute path").Make()
 	}
 
 	parts := strings.Split(Clean(path), "/")

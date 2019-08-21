@@ -16,18 +16,18 @@ const (
 )
 
 var (
-	// ErrFileSystem is a generic file system related error.
-	ErrFileSystem = errors.New("A file system error occured")
+	// Err is a generic file system related error.
+	Err = errors.New("A file system error occured")
 	// ErrNotSupported is returned when using a function that is not supported.
 	ErrNotSupported = errors.New("Operation %s is not supported by the file system")
-	// ErrInvalidPath occurs when using malformed paths.
-	ErrInvalidPath = errors.New("Malformed path")
 	// ErrFileNotExists occurs when an action failed because of a missing file.
 	ErrFileNotExists = errors.New("The file %q does not exist")
 	// ErrDirectoryNotExists occurs when an action failed because of a missing directory.
 	ErrDirectoryNotExists = errors.New("The directory %q does not exist")
 	// ErrAccessDenied denotes an error caused by insufficient privileges.
 	ErrAccessDenied = errors.New("Acces to %q denied")
+	// ErrNotEmpty occurs when trying to delete a non-empty directory without recursive flag.
+	ErrNotEmpty = errors.New("The directory is not empty")
 )
 
 // ReadFileSystemDriver describes functionality to read from a file system.
@@ -38,14 +38,15 @@ type ReadFileSystemDriver interface {
 
 	ReadDir(path string) ([]FileInfo, errors.Error)
 
-	OpenFile(path string) (File, errors.Error)
+	OpenFile(path string, flags OpenFlags) (File, errors.Error)
 }
 
 // ReadWriteFileSystemDriver describes functionality to write to a file system.
 type ReadWriteFileSystemDriver interface {
 	ReadFileSystemDriver
 
-	CreateFile(path string) (File, errors.Error)
+	//CreateFile(path string) (File, errors.Error)
+	CreateDirectory(path string) errors.Error
 
 	DeleteFile(path string) errors.Error
 	DeleteDirectory(path string, recursive bool) errors.Error
@@ -81,14 +82,60 @@ type File interface {
 	io.Closer
 }
 
+// OpenFlags specifies information on how to open a file.
+type OpenFlags int
+
+const (
+	// OpenReadOnly denotes opening a file using read-only access.
+	OpenReadOnly OpenFlags = OpenFlags(os.O_RDONLY)
+	// OpenWriteOnly denotes opening a file using write-only access.
+	OpenWriteOnly OpenFlags = OpenFlags(os.O_WRONLY)
+	// OpenReadWrite denotes opening a file using read-write access.
+	OpenReadWrite OpenFlags = OpenFlags(os.O_RDWR)
+)
+
+// IsRead returns whether the given flags require read access.
+func (flag OpenFlags) IsRead() bool {
+	return (int(flag)&os.O_RDONLY) > 0 || (int(flag)&os.O_RDWR) > 0
+}
+
+// IsWrite returns whether the given flags require write access.
+func (flag OpenFlags) IsWrite() bool {
+	return (int(flag)&os.O_WRONLY) > 0 || (int(flag)&os.O_RDWR) > 0
+}
+
+// Append opens the file for appending.
+func (flag OpenFlags) Append() OpenFlags {
+	return OpenFlags(int(flag) | os.O_APPEND)
+}
+
+// Create creates the file if it does not exist.
+func (flag OpenFlags) Create() OpenFlags {
+	return OpenFlags(int(flag) | os.O_CREATE)
+}
+
+// Exclusive opens the file for appending.
+func (flag OpenFlags) Exclusive() OpenFlags {
+	return OpenFlags(int(flag) | os.O_EXCL)
+}
+
+// Sync opens the file for appending.
+func (flag OpenFlags) Sync() OpenFlags {
+	return OpenFlags(int(flag) | os.O_SYNC)
+}
+
+// Truncate opens the file for appending.
+func (flag OpenFlags) Truncate() OpenFlags {
+	return OpenFlags(int(flag) | os.O_TRUNC)
+}
+
 // FileSystem offers advanced functionality based on a file system driver.
 type FileSystem struct {
-	driver                     interface{}
 	rDriver                    ReadFileSystemDriver
 	rwDriver                   ReadWriteFileSystemDriver
 	tmpDriver                  TempFileSystemDriver
 	canRead, canWrite, canTemp bool
-	lineSeparator              string
+	LineSeparator              string
 }
 
 // New returns a new file system with local file system driver.
@@ -104,7 +151,7 @@ func NewWithDriver(driver interface{}) *FileSystem {
 	if !rDriverOk && !rwDriverOk && !tmpDriverOk {
 		panic(fmt.Sprintf("fs.New expects valid File System Driver but got %T instead", driver))
 	}
-	return &FileSystem{driver, rDriver, rwDriver, tmpDriver, rDriverOk, rwDriverOk, tmpDriverOk, DefaultLineDelimiter}
+	return &FileSystem{rDriver, rwDriver, tmpDriver, rDriverOk, rwDriverOk, tmpDriverOk, DefaultLineDelimiter}
 }
 
 // CanRead returns true when the file system can perform read operations.
@@ -172,13 +219,25 @@ func (fs *FileSystem) ReadDir(path string) ([]FileInfo, errors.Error) {
 	return fs.rDriver.ReadDir(path)
 }
 
-// OpenFile opens a file instance and returns the handle.
-func (fs *FileSystem) OpenFile(path string) (File, errors.Error) {
+// Open opens a file instance for reading and returns the handle.
+func (fs *FileSystem) Open(path string) (File, errors.Error) {
 	if !fs.canRead {
 		return nil, ErrNotSupported.Args("Open").Make()
 	}
 
-	return fs.rDriver.OpenFile(path)
+	return fs.rDriver.OpenFile(path, OpenReadOnly)
+}
+
+// OpenFile opens a general purpose file instance based on flags and returns the handle.
+func (fs *FileSystem) OpenFile(path string, flags OpenFlags) (File, errors.Error) {
+	if flags.IsRead() && !fs.canRead {
+		return nil, ErrNotSupported.Args("OpenFile (read)").Make()
+	}
+	if flags.IsWrite() && !fs.canWrite {
+		return nil, ErrNotSupported.Args("OpenFile (write)").Make()
+	}
+
+	return fs.rDriver.OpenFile(path, flags)
 }
 
 // ReadBytes returns all bytes contained in a file.
@@ -187,7 +246,7 @@ func (fs *FileSystem) ReadBytes(path string) ([]byte, errors.Error) {
 		return nil, ErrNotSupported.Args("ReadBytes").Make()
 	}
 
-	f, err := fs.OpenFile(path)
+	f, err := fs.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +254,7 @@ func (fs *FileSystem) ReadBytes(path string) ([]byte, errors.Error) {
 
 	data, readErr := ioutil.ReadAll(f)
 	if readErr != nil {
-		return nil, ErrFileSystem.Msg("Failed to read file").Make().Cause(readErr)
+		return nil, Err.Msg("Failed to read file").Make().Cause(readErr)
 	}
 
 	return data, nil
@@ -238,10 +297,10 @@ func (fs *FileSystem) ReadLines(path string) ([]string, errors.Error) {
 // CreateFile a new file (or truncate an existing) and return the file instance handle.
 func (fs *FileSystem) CreateFile(path string) (File, errors.Error) {
 	if !fs.canWrite {
-		return nil, ErrNotSupported.Args("Create").Make()
+		return nil, ErrNotSupported.Args("CreateFile").Make()
 	}
 
-	return fs.rwDriver.CreateFile(path)
+	return fs.rwDriver.OpenFile(path, OpenReadWrite.Create().Truncate())
 }
 
 // WriteBytes writes all bytes to a file.
@@ -257,7 +316,7 @@ func (fs *FileSystem) WriteBytes(path string, content []byte) errors.Error {
 	defer f.Close()
 
 	if _, err := f.Write(content); err != nil {
-		return ErrFileSystem.Msg("Failed to write file").Make().Cause(err)
+		return Err.Msg("Failed to write file").Make().Cause(err)
 	}
 	return nil
 }
@@ -277,7 +336,43 @@ func (fs *FileSystem) WriteLines(path string, lines []string) errors.Error {
 		return ErrNotSupported.Args("WriteLines").Make()
 	}
 
-	return fs.WriteBytes(path, []byte(strings.Join(lines, fs.lineSeparator)))
+	return fs.WriteBytes(path, []byte(strings.Join(lines, fs.LineSeparator)))
+}
+
+// DeleteFile deletes a file.
+func (fs *FileSystem) DeleteFile(path string) errors.Error {
+	if !fs.canWrite {
+		return ErrNotSupported.Args("DeleteFile").Make()
+	}
+
+	return fs.rwDriver.DeleteFile(path)
+}
+
+// DeleteDirectory deletes an empty directory. If recursive is set, all contained items will be deleted first.
+func (fs *FileSystem) DeleteDirectory(path string, recursive bool) errors.Error {
+	if !fs.canWrite {
+		return ErrNotSupported.Args("DeleteDirectory").Make()
+	}
+
+	return fs.rwDriver.DeleteDirectory(path, recursive)
+}
+
+// MoveFile moves a file to a new location.
+func (fs *FileSystem) MoveFile(src, dst string) errors.Error {
+	if !fs.canWrite {
+		return ErrNotSupported.Args("MoveFile").Make()
+	}
+
+	return fs.rwDriver.MoveFile(src, dst)
+}
+
+// MoveDir moves a directory to a new location.
+func (fs *FileSystem) MoveDir(src, dst string) errors.Error {
+	if !fs.canWrite {
+		return ErrNotSupported.Args("MoveDir").Make()
+	}
+
+	return fs.rwDriver.MoveDir(src, dst)
 }
 
 // CopyFile clones a file and overwrites the existing one.
@@ -286,7 +381,7 @@ func (fs *FileSystem) CopyFile(src, dst string) errors.Error {
 		return ErrNotSupported.Args("CopyFile").Make()
 	}
 
-	reader, err := fs.OpenFile(src)
+	reader, err := fs.Open(src)
 	if err != nil {
 		return err
 	}
@@ -299,7 +394,7 @@ func (fs *FileSystem) CopyFile(src, dst string) errors.Error {
 	defer writer.Close()
 
 	if _, err := io.Copy(writer, reader); err != nil {
-		return ErrFileSystem.Msg("Failed to copy file").Make().Cause(err)
+		return Err.Msg("Failed to copy file").Make().Cause(err)
 	}
 	return nil
 }

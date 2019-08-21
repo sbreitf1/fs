@@ -28,14 +28,74 @@ func IsDir(path string) (bool, errors.Error) {
 	return DefaultFileSystem.IsDir(path)
 }
 
+// ReadDir returns all files and directories contained in a directory.
+func ReadDir(path string) ([]FileInfo, errors.Error) {
+	return DefaultFileSystem.ReadDir(path)
+}
+
+// Open opens a file instance for reading and returns the handle.
+func Open(path string) (File, errors.Error) {
+	return DefaultFileSystem.Open(path)
+}
+
+// OpenFile opens a general purpose file instance based on flags and returns the handle.
+func OpenFile(path string, flags OpenFlags) (File, errors.Error) {
+	return DefaultFileSystem.OpenFile(path, flags)
+}
+
+// ReadBytes returns all bytes contained in a file.
+func ReadBytes(path string) ([]byte, errors.Error) {
+	return DefaultFileSystem.ReadBytes(path)
+}
+
+// ReadString returns the file content as string.
+func ReadString(path string) (string, errors.Error) {
+	return DefaultFileSystem.ReadString(path)
+}
+
 // ReadLines returns all lines separated by "\n", "\r" or "\r\n" from a file.
 func ReadLines(path string) ([]string, errors.Error) {
 	return DefaultFileSystem.ReadLines(path)
 }
 
+// CreateFile a new file (or truncate an existing) and return the file instance handle.
+func CreateFile(path string) (File, errors.Error) {
+	return DefaultFileSystem.CreateFile(path)
+}
+
+// WriteBytes writes all bytes to a file.
+func WriteBytes(path string, content []byte) errors.Error {
+	return DefaultFileSystem.WriteBytes(path, content)
+}
+
+// WriteString writes a string to a file.
+func WriteString(path, content string) errors.Error {
+	return DefaultFileSystem.WriteString(path, content)
+}
+
 // WriteLines writes all lines separated by the default line separator to a file.
 func WriteLines(path string, lines []string) errors.Error {
 	return DefaultFileSystem.WriteLines(path, lines)
+}
+
+// DeleteFile deletes a file.
+func DeleteFile(path string) errors.Error {
+	return DefaultFileSystem.DeleteFile(path)
+}
+
+// DeleteDirectory deletes an empty directory. If recursive is set, all contained items will be deleted first.
+func DeleteDirectory(path string, recursive bool) errors.Error {
+	return DefaultFileSystem.DeleteDirectory(path, recursive)
+}
+
+// MoveFile moves a file to a new location.
+func MoveFile(src, dst string) errors.Error {
+	return DefaultFileSystem.MoveFile(src, dst)
+}
+
+// MoveDir moves a directory to a new location.
+func MoveDir(src, dst string) errors.Error {
+	return DefaultFileSystem.MoveDir(src, dst)
 }
 
 // Copy clone a file or directory to the target. If the target already exists, it must be the same element type (file or directory) to be overwritten.
@@ -51,6 +111,11 @@ func CopyFile(src, dst string) errors.Error {
 // CopyDir recursively clones a directory overwriting all existing files.
 func CopyDir(src, dst string) errors.Error {
 	panic("CopyDir not implemented yet")
+}
+
+// CleanDir removes all files and directories from a directory.
+func CleanDir(path string) errors.Error {
+	return DefaultFileSystem.CleanDir(path)
 }
 
 // WithTempFile creates a temporary file and deletes it when f returns.

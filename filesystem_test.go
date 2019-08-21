@@ -22,6 +22,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNewUtilInvalid(t *testing.T) {
+	assert.Panics(t, func() { NewWithDriver(nil) })
 	assert.Panics(t, func() { NewWithDriver("not a file system driver") })
 }
 
@@ -33,9 +34,9 @@ func TestFileSystemCommon(t *testing.T) {
 	}))
 }
 
-func testFS(t *testing.T, fs *FileSystem, tmpDir string) {
+func testFS(t *testing.T, fs *FileSystem, dir string) {
 	t.Run("TestReadString", func(t *testing.T) {
-		path := path.Join(tmpDir, "test.txt")
+		path := path.Join(dir, "test.txt")
 		if err := ioutil.WriteFile(path, []byte("a new cool file content"), os.ModePerm); err != nil {
 			panic(err)
 		}
@@ -45,11 +46,53 @@ func testFS(t *testing.T, fs *FileSystem, tmpDir string) {
 	})
 
 	t.Run("TestWriteLines", func(t *testing.T) {
-		path := path.Join(tmpDir, "test.txt")
+		path := path.Join(dir, "test.txt")
 		errors.AssertNil(t, fs.WriteLines(path, []string{"foo", "bar", "", "yeah!", ""}))
 		assert.FileExists(t, path)
 		data, err := fs.ReadString(path)
 		errors.AssertNil(t, err)
 		assert.Equal(t, "foo\nbar\n\nyeah!\n", data)
+	})
+
+	t.Run("TestOpenWrite", func(t *testing.T) {
+		path := path.Join(dir, "openwritetest.txt")
+		errors.AssertNil(t, fs.WriteString(path, "foo bar cool test data content"))
+
+		f, err := fs.OpenFile(path, OpenReadWrite)
+		errors.AssertNil(t, err)
+		f.Write([]byte("short stuff"))
+		f.Close()
+
+		data, err := fs.ReadString(path)
+		errors.AssertNil(t, err)
+		assert.Equal(t, "short stuffl test data content", data)
+	})
+
+	t.Run("TestTruncate", func(t *testing.T) {
+		path := path.Join(dir, "trunctest.txt")
+		errors.AssertNil(t, fs.WriteString(path, "foo bar cool test data content"))
+
+		f, err := fs.OpenFile(path, OpenReadWrite.Truncate())
+		errors.AssertNil(t, err)
+		f.Write([]byte("short stuff"))
+		f.Close()
+
+		data, err := fs.ReadString(path)
+		errors.AssertNil(t, err)
+		assert.Equal(t, "short stuff", data)
+	})
+
+	t.Run("TestAppend", func(t *testing.T) {
+		path := path.Join(dir, "appendtest.txt")
+		errors.AssertNil(t, fs.WriteString(path, "foo bar"))
+
+		f, err := fs.OpenFile(path, OpenReadWrite.Append())
+		errors.AssertNil(t, err)
+		f.Write([]byte(" - short stuff"))
+		f.Close()
+
+		data, err := fs.ReadString(path)
+		errors.AssertNil(t, err)
+		assert.Equal(t, "foo bar - short stuff", data)
 	})
 }

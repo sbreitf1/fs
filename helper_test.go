@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/sbreitf1/fs/path"
+
 	"github.com/sbreitf1/errors"
 	"github.com/stretchr/testify/assert"
 )
@@ -72,7 +74,13 @@ func TestCopyFile(t *testing.T) {
 }
 
 func TestReadLines(t *testing.T) {
-	lines, err := ReadLines("test/lines-test.txt")
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"this", "is", "", "a new line with spaces", ""}, lines)
+	assert.NoError(t, WithTempDir("fs-test-", func(tmpDir string) errors.Error {
+		ioutil.WriteFile(path.Join(tmpDir, "lines-test.txt"), []byte("this\nis\r\n\na new line with spaces\r"), os.ModePerm)
+
+		lines, err := ReadLines(path.Join(tmpDir, "lines-test.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"this", "is", "", "a new line with spaces", ""}, lines)
+
+		return nil
+	}))
 }
