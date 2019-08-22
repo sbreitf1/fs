@@ -151,7 +151,7 @@ func New() *FileSystem {
 	return NewWithDriver(&LocalDriver{})
 }
 
-// NewWithDriver returns a new file system using the given file system driver.
+// NewWithDriver returns a new file system using the given file system driver. The given driver must implement at least one of the file system driver interfaces.
 func NewWithDriver(driver interface{}) *FileSystem {
 	rDriver, rDriverOk := driver.(ReadFileSystemDriver)
 	rwDriver, rwDriverOk := driver.(ReadWriteFileSystemDriver)
@@ -365,6 +365,15 @@ func (fs *FileSystem) DeleteDirectory(path string, recursive bool) errors.Error 
 	return fs.rwDriver.DeleteDirectory(path, recursive)
 }
 
+// CleanDir removes all files and directories from a directory.
+func (fs *FileSystem) CleanDir(path string) errors.Error {
+	return nil
+}
+
+/* ############################################### */
+/* ###             Move and Copy               ### */
+/* ############################################### */
+
 // MoveFile moves a file to a new location.
 func (fs *FileSystem) MoveFile(src, dst string) errors.Error {
 	if !fs.canWrite {
@@ -381,6 +390,14 @@ func (fs *FileSystem) MoveDir(src, dst string) errors.Error {
 	}
 
 	return fs.rwDriver.MoveDir(src, dst)
+}
+
+//TODO MoveDir with callback before overwrite (cancel/skip/overwrite/rename) -> maybe replace existing MoveDir method?
+// -> specify default handlers for cancel / skip / overwrite and rename by adding a number
+
+// Copy clone a file or directory to the target. If the target already exists, it must be the same element type (file or directory) to be overwritten.
+func (fs *FileSystem) Copy(src, dst string) errors.Error {
+	panic("Copy not implemented yet")
 }
 
 // CopyFile clones a file and overwrites the existing one.
@@ -407,14 +424,34 @@ func (fs *FileSystem) CopyFile(src, dst string) errors.Error {
 	return nil
 }
 
-// CleanDir removes all files and directories from a directory.
-func (fs *FileSystem) CleanDir(path string) errors.Error {
-	return nil
+// CopyDir recursively clones a directory overwriting all existing files.
+func (fs *FileSystem) CopyDir(src, dst string) errors.Error {
+	panic("CopyDir not implemented yet")
 }
+
+//TODO CopyDir with callback before overwrite (cancel/skip/overwrite/rename)
 
 /* ############################################### */
 /* ###               Temp Files                ### */
 /* ############################################### */
+
+// GetTempFile returns the path to an empty temporary file.
+func (fs *FileSystem) GetTempFile(pattern string) (string, errors.Error) {
+	if !fs.canTemp {
+		return "", ErrNotSupported.Args("GetTempFile").Make()
+	}
+
+	return fs.tmpDriver.GetTempFile(pattern)
+}
+
+// GetTempDir returns the path to an empty temporary dir.
+func (fs *FileSystem) GetTempDir(prefix string) (string, errors.Error) {
+	if !fs.canTemp {
+		return "", ErrNotSupported.Args("GetTempDir").Make()
+	}
+
+	return fs.tmpDriver.GetTempDir(prefix)
+}
 
 /* ############################################### */
 /* ###                Contexts                 ### */
@@ -422,6 +459,10 @@ func (fs *FileSystem) CleanDir(path string) errors.Error {
 
 // WithTempFile creates a temporary file and deletes it when f returns.
 func (fs *FileSystem) WithTempFile(pattern string, f func(tmpFile string) errors.Error) errors.Error {
+	if !fs.canTemp {
+		return ErrNotSupported.Args("WithTempFile").Make()
+	}
+
 	tmpFile, err := fs.tmpDriver.GetTempFile(pattern)
 	if err != nil {
 		return err
@@ -433,6 +474,10 @@ func (fs *FileSystem) WithTempFile(pattern string, f func(tmpFile string) errors
 
 // WithTempDir creates a temporary directory and deletes it when f returns.
 func (fs *FileSystem) WithTempDir(prefix string, f func(tmpDir string) errors.Error) errors.Error {
+	if !fs.canTemp {
+		return ErrNotSupported.Args("WithTempDir").Make()
+	}
+
 	tmpDir, err := fs.tmpDriver.GetTempDir(prefix)
 	if err != nil {
 		return err

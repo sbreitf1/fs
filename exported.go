@@ -100,7 +100,7 @@ func MoveDir(src, dst string) errors.Error {
 
 // Copy clone a file or directory to the target. If the target already exists, it must be the same element type (file or directory) to be overwritten.
 func Copy(src, dst string) errors.Error {
-	panic("Copy not implemented yet")
+	return DefaultFileSystem.Copy(src, dst)
 }
 
 // CopyFile clones a file and overwrites the existing one.
@@ -110,12 +110,22 @@ func CopyFile(src, dst string) errors.Error {
 
 // CopyDir recursively clones a directory overwriting all existing files.
 func CopyDir(src, dst string) errors.Error {
-	panic("CopyDir not implemented yet")
+	return DefaultFileSystem.CopyDir(src, dst)
 }
 
 // CleanDir removes all files and directories from a directory.
 func CleanDir(path string) errors.Error {
 	return DefaultFileSystem.CleanDir(path)
+}
+
+// GetTempFile returns the path to an empty temporary file.
+func GetTempFile(pattern string) (string, errors.Error) {
+	return DefaultFileSystem.GetTempFile(pattern)
+}
+
+// GetTempDir returns the path to an empty temporary dir.
+func GetTempDir(prefix string) (string, errors.Error) {
+	return DefaultFileSystem.GetTempDir(prefix)
 }
 
 // WithTempFile creates a temporary file and deletes it when f returns.
