@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/sbreitf1/errors"
@@ -311,6 +312,15 @@ func (fs *FileSystem) CreateFile(path string) (File, errors.Error) {
 	return fs.rwDriver.OpenFile(path, OpenReadWrite.Create().Truncate())
 }
 
+// CreateDirectory creates a new directory and all parent directories if they do not exist.
+func (fs *FileSystem) CreateDirectory(path string) errors.Error {
+	if !fs.canWrite {
+		return ErrNotSupported.Args("CreateDirectory").Make()
+	}
+
+	return fs.rwDriver.CreateDirectory(path)
+}
+
 // WriteBytes writes all bytes to a file.
 func (fs *FileSystem) WriteBytes(path string, content []byte) errors.Error {
 	if !fs.canWrite {
@@ -392,6 +402,11 @@ func (fs *FileSystem) MoveDir(src, dst string) errors.Error {
 	return fs.rwDriver.MoveDir(src, dst)
 }
 
+// MoveAll moves all files and directories contained in src to dst.
+func (fs *FileSystem) MoveAll(src, dst string) errors.Error {
+	panic("MoveAll not implemented yet")
+}
+
 //TODO MoveDir with callback before overwrite (cancel/skip/overwrite/rename) -> maybe replace existing MoveDir method?
 // -> specify default handlers for cancel / skip / overwrite and rename by adding a number
 
@@ -426,7 +441,58 @@ func (fs *FileSystem) CopyFile(src, dst string) errors.Error {
 
 // CopyDir recursively clones a directory overwriting all existing files.
 func (fs *FileSystem) CopyDir(src, dst string) errors.Error {
-	panic("CopyDir not implemented yet")
+	if !fs.canWrite {
+		return ErrNotSupported.Args("CopyDir").Make()
+	}
+
+	if err := fs.rwDriver.CreateDirectory(dst); err != nil {
+		return err
+	}
+
+	files, err := fs.rDriver.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		if f.IsDir() {
+			if err := fs.CopyDir(path.Join(src, f.Name()), path.Join(dst, f.Name())); err != nil {
+				return err
+			}
+		} else {
+			if err := fs.CopyFile(path.Join(src, f.Name()), path.Join(dst, f.Name())); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// CopyAll copies all files and directories contained in src to dst.
+func (fs *FileSystem) CopyAll(src, dst string) errors.Error {
+	if !fs.canWrite {
+		return ErrNotSupported.Args("CopyAll").Make()
+	}
+
+	files, err := fs.rDriver.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		if f.IsDir() {
+			if err := fs.CopyDir(path.Join(src, f.Name()), path.Join(dst, f.Name())); err != nil {
+				return err
+			}
+		} else {
+			if err := fs.CopyFile(path.Join(src, f.Name()), path.Join(dst, f.Name())); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 //TODO CopyDir with callback before overwrite (cancel/skip/overwrite/rename)

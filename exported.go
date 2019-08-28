@@ -63,6 +63,11 @@ func CreateFile(path string) (File, errors.Error) {
 	return DefaultFileSystem.CreateFile(path)
 }
 
+// CreateDirectory creates a new directory and all parent directories if they do not exist.
+func CreateDirectory(path string) errors.Error {
+	return DefaultFileSystem.CreateDirectory(path)
+}
+
 // WriteBytes writes all bytes to a file.
 func WriteBytes(path string, content []byte) errors.Error {
 	return DefaultFileSystem.WriteBytes(path, content)
@@ -98,6 +103,11 @@ func MoveDir(src, dst string) errors.Error {
 	return DefaultFileSystem.MoveDir(src, dst)
 }
 
+// MoveAll moves all files and directories contained in src to dst.
+func MoveAll(src, dst string) errors.Error {
+	return DefaultFileSystem.MoveAll(src, dst)
+}
+
 // Copy clone a file or directory to the target. If the target already exists, it must be the same element type (file or directory) to be overwritten.
 func Copy(src, dst string) errors.Error {
 	return DefaultFileSystem.Copy(src, dst)
@@ -111,6 +121,11 @@ func CopyFile(src, dst string) errors.Error {
 // CopyDir recursively clones a directory overwriting all existing files.
 func CopyDir(src, dst string) errors.Error {
 	return DefaultFileSystem.CopyDir(src, dst)
+}
+
+// CopyAll copies all files and directories contained in src to dst.
+func CopyAll(src, dst string) errors.Error {
+	return DefaultFileSystem.CopyAll(src, dst)
 }
 
 // CleanDir removes all files and directories from a directory.

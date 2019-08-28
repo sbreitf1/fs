@@ -51,18 +51,49 @@ func testFS(t *testing.T, fs *FileSystem, dir string) {
 		if err := ioutil.WriteFile(path, []byte("a new cool file content"), os.ModePerm); err != nil {
 			panic(err)
 		}
-		data, err := fs.ReadString(path)
-		errors.AssertNil(t, err)
-		assert.Equal(t, "a new cool file content", data)
+		assertFileContent(t, fs, path, "a new cool file content")
 	})
 
 	t.Run("TestWriteLines", func(t *testing.T) {
 		path := path.Join(dir, "test.txt")
 		errors.AssertNil(t, fs.WriteLines(path, []string{"foo", "bar", "", "yeah!", ""}))
-		assert.FileExists(t, path)
-		data, err := fs.ReadString(path)
-		errors.AssertNil(t, err)
-		assert.Equal(t, "foo\nbar\n\nyeah!\n", data)
+		assertFileContent(t, fs, path, "foo\nbar\n\nyeah!\n")
+	})
+
+	t.Run("TestCreateDirectory", func(t *testing.T) {
+		path := path.Join(dir, "testdir/subdir")
+		assertNotExists(t, fs, path)
+		fs.CreateDirectory(path)
+		assertIsDir(t, fs, path)
+	})
+
+	t.Run("TestCopyFile", func(t *testing.T) {
+		src := path.Join(dir, "test.txt")
+		dst := path.Join(dir, "testdir/subdir/foobar.txt")
+		errors.AssertNil(t, fs.CopyFile(src, dst))
+		assertFileContent(t, fs, dst, "foo\nbar\n\nyeah!\n")
+	})
+
+	t.Run("TestCopyDir", func(t *testing.T) {
+		src := path.Join(dir, "testdir")
+		dst := path.Join(dir, "justanotherdir")
+		fs.CreateDirectory(path.Join(src, "subdir/foobar1337"))
+		errors.AssertNil(t, fs.CopyDir(src, dst))
+		// new file has correct content
+		assertFileContent(t, fs, path.Join(dst, "subdir/foobar.txt"), "foo\nbar\n\nyeah!\n")
+		// empty dir is copied aswell
+		assertIsDir(t, fs, path.Join(dst, "subdir/foobar1337"))
+		// old file still exists
+		assertIsFile(t, fs, path.Join(src, "subdir/foobar.txt"))
+	})
+
+	t.Run("TestCopyAll", func(t *testing.T) {
+		src := path.Join(dir, "justanotherdir/subdir")
+		errors.AssertNil(t, fs.CopyAll(src, dir))
+		// new file has correct content
+		assertFileContent(t, fs, path.Join(dir, "foobar.txt"), "foo\nbar\n\nyeah!\n")
+		// old file still exists
+		assertIsFile(t, fs, path.Join(src, "foobar.txt"))
 	})
 
 	t.Run("TestOpenWrite", func(t *testing.T) {
@@ -74,9 +105,7 @@ func testFS(t *testing.T, fs *FileSystem, dir string) {
 		f.Write([]byte("short stuff"))
 		f.Close()
 
-		data, err := fs.ReadString(path)
-		errors.AssertNil(t, err)
-		assert.Equal(t, "short stuffl test data content", data)
+		assertFileContent(t, fs, path, "short stuffl test data content")
 	})
 
 	t.Run("TestTruncate", func(t *testing.T) {
@@ -88,9 +117,7 @@ func testFS(t *testing.T, fs *FileSystem, dir string) {
 		f.Write([]byte("short stuff"))
 		f.Close()
 
-		data, err := fs.ReadString(path)
-		errors.AssertNil(t, err)
-		assert.Equal(t, "short stuff", data)
+		assertFileContent(t, fs, path, "short stuff")
 	})
 
 	t.Run("TestAppend", func(t *testing.T) {
@@ -102,8 +129,42 @@ func testFS(t *testing.T, fs *FileSystem, dir string) {
 		f.Write([]byte(" - short stuff"))
 		f.Close()
 
-		data, err := fs.ReadString(path)
-		errors.AssertNil(t, err)
-		assert.Equal(t, "foo bar - short stuff", data)
+		assertFileContent(t, fs, path, "foo bar - short stuff")
 	})
+}
+
+/* ############################################### */
+/* ###               Test Heper                ### */
+/* ############################################### */
+
+func assertNotExists(t *testing.T, fs *FileSystem, path string) bool {
+	exists, err := fs.Exists(path)
+	if errors.AssertNil(t, err, "Error while checking for %q", path) {
+		return assert.False(t, exists, "Expected %q to not exist", path)
+	}
+	return false
+}
+
+func assertIsFile(t *testing.T, fs *FileSystem, path string) bool {
+	isFile, err := fs.IsFile(path)
+	if errors.AssertNil(t, err, "Error while checking for file %q", path) {
+		return assert.True(t, isFile, "Expected file %q does not exist", path)
+	}
+	return false
+}
+
+func assertIsDir(t *testing.T, fs *FileSystem, path string) bool {
+	isDir, err := fs.IsDir(path)
+	if errors.AssertNil(t, err, "Error while checking for dir %q", path) {
+		return assert.True(t, isDir, "Expected directory %q does not exist", path)
+	}
+	return false
+}
+
+func assertFileContent(t *testing.T, fs *FileSystem, path, expectedContent string) bool {
+	data, err := fs.ReadString(path)
+	if errors.AssertNil(t, err, "Error while accessing fiile %q", path) {
+		return assert.Equal(t, expectedContent, data, "Unexpected file content of %q", path)
+	}
+	return false
 }
