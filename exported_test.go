@@ -3,7 +3,6 @@ package fs
 import (
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/sbreitf1/fs/path"
@@ -52,9 +51,9 @@ func TestCopyFile(t *testing.T) {
 	assert.NoError(t, WithTempDir("fs-test-", func(tmpDir string) errors.Error {
 		expectedData := []byte("this is a test")
 
-		oldFile := filepath.Join(tmpDir, "test.txt")
+		oldFile := path.Join(tmpDir, "test.txt")
 		ioutil.WriteFile(oldFile, expectedData, os.ModePerm)
-		newFile := filepath.Join(tmpDir, "other.txt")
+		newFile := path.Join(tmpDir, "other.txt")
 
 		exists, err := Exists(newFile)
 		assert.NoError(t, err)

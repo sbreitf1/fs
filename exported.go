@@ -93,6 +93,11 @@ func DeleteDirectory(path string, recursive bool) errors.Error {
 	return DefaultFileSystem.DeleteDirectory(path, recursive)
 }
 
+// Move moves a file or directory to a new location. If the target already exists, it must be the same element type (file or directory) to be overwritten.
+func Move(src, dst string) errors.Error {
+	return DefaultFileSystem.Move(src, dst)
+}
+
 // MoveFile moves a file to a new location.
 func MoveFile(src, dst string) errors.Error {
 	return DefaultFileSystem.MoveFile(src, dst)

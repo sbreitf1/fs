@@ -131,10 +131,134 @@ func testFS(t *testing.T, fs *FileSystem, dir string) {
 
 		assertFileContent(t, fs, path, "foo bar - short stuff")
 	})
+
+	t.Run("TestDeleteFile", func(t *testing.T) {
+		path := path.Join(dir, "appendtest.txt")
+		errors.AssertNil(t, fs.DeleteFile(path))
+		assertNotExists(t, fs, path)
+	})
+
+	t.Run("TestDeleteDirFail", func(t *testing.T) {
+		p := path.Join(dir, "justanotherdir")
+		errors.Assert(t, ErrNotEmpty, fs.DeleteDirectory(p, false))
+		assertIsDir(t, fs, p)
+	})
+
+	t.Run("TestDeleteDirRecursive", func(t *testing.T) {
+		p := path.Join(dir, "justanotherdir")
+		errors.AssertNil(t, fs.DeleteDirectory(p, true))
+		assertNotExists(t, fs, p)
+	})
+
+	t.Run("TestCleanDir", func(t *testing.T) {
+		errors.AssertNil(t, fs.CleanDir(dir))
+		files, err := fs.ReadDir(dir)
+		errors.AssertNil(t, err)
+		assert.Len(t, files, 0)
+	})
+
+	t.Run("TestWalk", func(t *testing.T) {
+		errors.AssertNil(t, fs.CreateDirectory(path.Join(dir, "foo")))
+		errors.AssertNil(t, fs.CreateDirectory(path.Join(dir, "foo/bar")))
+		errors.AssertNil(t, fs.WriteString(path.Join(dir, "foo/bar/test.txt"), "foo bar"))
+		assertWalk(t, fs, path.Join(dir, "foo"), nil, []string{"bar", "test.txt"}, []string{"bar"}, []string{"bar"})
+	})
+
+	t.Run("TestWalkFlat", func(t *testing.T) {
+		assertWalk(t, fs, path.Join(dir, "foo"), &WalkOptions{SkipSubDirs: true}, []string{"bar"}, []string{}, []string{})
+	})
+
+	t.Run("TestWalkError", func(t *testing.T) {
+		errTest := errors.New("TestError")
+
+		errors.Assert(t, errTest, fs.Walk(path.Join(dir, "foo"), func(dir string, f FileInfo) errors.Error {
+			if f.Name() == "test.txt" {
+				// wait for inner directory to also test recursive error passing
+				return errTest.Make()
+			}
+			return nil
+		}, nil, nil, nil))
+
+		errors.Assert(t, errTest, fs.Walk(path.Join(dir, "foo"), nil, func(dir string, f FileInfo, skipDir *bool) errors.Error {
+			return errTest.Make()
+		}, nil, nil))
+
+		errors.Assert(t, errTest, fs.Walk(path.Join(dir, "foo"), nil, nil, func(dir string, f FileInfo) errors.Error {
+			return errTest.Make()
+		}, nil))
+	})
+
+	t.Run("TestWalkSkipDir", func(t *testing.T) {
+		visitCount := 0
+		visitExpected := []string{"bar"}
+		errors.AssertNil(t, fs.Walk(path.Join(dir, "foo"), func(dir string, f FileInfo) errors.Error {
+			assert.Equal(t, visitExpected[visitCount], f.Name())
+			visitCount++
+			return nil
+		}, func(dir string, f FileInfo, skipDir *bool) errors.Error {
+			*skipDir = true
+			return nil
+		}, nil, nil))
+		assert.Equal(t, len(visitExpected), visitCount)
+	})
+
+	t.Run("TestMoveFile", func(t *testing.T) {
+		errors.AssertNil(t, fs.Move(path.Join(dir, "foo/bar/test.txt"), path.Join(dir, "foo/test.txt")))
+		assertNotExists(t, fs, path.Join(dir, "foo/bar/test.txt"))
+		assertFileContent(t, fs, path.Join(dir, "foo/test.txt"), "foo bar")
+	})
+
+	t.Run("TestMoveDir", func(t *testing.T) {
+		errors.AssertNil(t, fs.Move(path.Join(dir, "foo"), path.Join(dir, "asdf")))
+		assertNotExists(t, fs, path.Join(dir, "foo"))
+		assertIsDir(t, fs, path.Join(dir, "asdf/bar"))
+		assertFileContent(t, fs, path.Join(dir, "asdf/test.txt"), "foo bar")
+	})
+
+	t.Run("TestMoveAll", func(t *testing.T) {
+		errors.AssertNil(t, fs.MoveAll(path.Join(dir, "asdf"), path.Join(dir)))
+		assertNotExists(t, fs, path.Join(dir, "asdf/bar"))
+		assertNotExists(t, fs, path.Join(dir, "asdf/test.txt"))
+		assertIsDir(t, fs, path.Join(dir, "bar"))
+		assertFileContent(t, fs, path.Join(dir, "test.txt"), "foo bar")
+	})
+
+	t.Run("TestCopyFile", func(t *testing.T) {
+		errors.AssertNil(t, fs.Copy(path.Join(dir, "test.txt"), path.Join(dir, "bar/test.txt")))
+		assertIsFile(t, fs, path.Join(dir, "test.txt"))
+		assertFileContent(t, fs, path.Join(dir, "bar/test.txt"), "foo bar")
+	})
+
+	t.Run("TestCopyDir", func(t *testing.T) {
+		errors.AssertNil(t, fs.Copy(path.Join(dir, "bar"), path.Join(dir, "asdf/bar")))
+		assertIsDir(t, fs, path.Join(dir, "bar"))
+		assertFileContent(t, fs, path.Join(dir, "asdf/bar/test.txt"), "foo bar")
+	})
+
+	t.Run("TestWalkComplex", func(t *testing.T) {
+		errors.AssertNil(t, fs.Move(path.Join(dir, "bar"), path.Join(dir, "asdf/test")))
+		errors.AssertNil(t, fs.Move(path.Join(dir, "test.txt"), path.Join(dir, "asdf/file.txt")))
+
+		dirCount := 0
+		fileCount := 0
+		size := int64(0)
+		errors.AssertNil(t, fs.Walk(path.Join(dir, "asdf"), func(dir string, f FileInfo) errors.Error {
+			if f.IsDir() {
+				dirCount++
+			} else {
+				fileCount++
+				size += f.Size()
+			}
+			return nil
+		}, nil, nil, nil))
+		assert.Equal(t, 2, dirCount)
+		assert.Equal(t, 3, fileCount)
+		assert.Equal(t, int64(21), size)
+	})
 }
 
 /* ############################################### */
-/* ###               Test Heper                ### */
+/* ###               Test Helper               ### */
 /* ############################################### */
 
 func assertNotExists(t *testing.T, fs *FileSystem, path string) bool {
@@ -167,4 +291,46 @@ func assertFileContent(t *testing.T, fs *FileSystem, path, expectedContent strin
 		return assert.Equal(t, expectedContent, data, "Unexpected file content of %q", path)
 	}
 	return false
+}
+
+func assertWalk(t *testing.T, fs *FileSystem, path string, options *WalkOptions, visitExpected, enterExpected, leaveExpected []string) bool {
+	errAssertionFailed := errors.New("AssertionFailed")
+	visitCount := 0
+	enterCount := 0
+	leaveCount := 0
+	err := fs.Walk(path, func(dir string, f FileInfo) errors.Error {
+		if !assert.Equal(t, visitExpected[visitCount], f.Name()) {
+			return errAssertionFailed.Make()
+		}
+		visitCount++
+		return nil
+	}, func(dir string, f FileInfo, skipDir *bool) errors.Error {
+		if !assert.Equal(t, enterExpected[enterCount], f.Name()) {
+			return errAssertionFailed.Make()
+		}
+		enterCount++
+		return nil
+	}, func(dir string, f FileInfo) errors.Error {
+		if !assert.Equal(t, leaveExpected[leaveCount], f.Name()) {
+			return errAssertionFailed.Make()
+		}
+		leaveCount++
+		return nil
+	}, options)
+
+	if errors.InstanceOf(err, errAssertionFailed) {
+		return false
+	}
+
+	if !assert.Equal(t, len(visitExpected), visitCount) {
+		return false
+	}
+	if !assert.Equal(t, len(enterExpected), enterCount) {
+		return false
+	}
+	if !assert.Equal(t, len(leaveExpected), leaveCount) {
+		return false
+	}
+
+	return true
 }
