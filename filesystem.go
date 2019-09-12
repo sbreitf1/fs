@@ -29,7 +29,7 @@ var (
 	// ErrDirectoryNotExists occurs when an action failed because of a missing directory.
 	ErrDirectoryNotExists = errors.New("The directory %q does not exist")
 	// ErrAccessDenied denotes an error caused by insufficient privileges.
-	ErrAccessDenied = errors.New("Acces to %q denied")
+	ErrAccessDenied = errors.New("Access to %q denied")
 	// ErrNotEmpty occurs when trying to delete a non-empty directory without recursive flag.
 	ErrNotEmpty = errors.New("The directory is not empty")
 )
@@ -40,6 +40,7 @@ type NavigationFileSystemDriver interface {
 	IsFile(path string) (bool, errors.Error)
 	IsDir(path string) (bool, errors.Error)
 
+	Stat(path string) (FileInfo, errors.Error)
 	ReadDir(path string) ([]FileInfo, errors.Error)
 }
 
@@ -54,7 +55,6 @@ type ReadFileSystemDriver interface {
 type ReadWriteFileSystemDriver interface {
 	ReadFileSystemDriver
 
-	//CreateFile(path string) (File, errors.Error)
 	CreateDirectory(path string) errors.Error
 
 	DeleteFile(path string) errors.Error
@@ -214,7 +214,7 @@ func (fs *FileSystem) Exists(path string) (bool, errors.Error) {
 		return false, ErrNotSupported.Args("Exists").Make()
 	}
 
-	return fs.rDriver.Exists(path)
+	return fs.navDriver.Exists(path)
 }
 
 // IsFile returns true, if the given path is a file.
@@ -223,7 +223,7 @@ func (fs *FileSystem) IsFile(path string) (bool, errors.Error) {
 		return false, ErrNotSupported.Args("IsFile").Make()
 	}
 
-	return fs.rDriver.IsFile(path)
+	return fs.navDriver.IsFile(path)
 }
 
 // IsDir returns true, if the given path is a directory.
@@ -232,7 +232,16 @@ func (fs *FileSystem) IsDir(path string) (bool, errors.Error) {
 		return false, ErrNotSupported.Args("IsDir").Make()
 	}
 
-	return fs.rDriver.IsDir(path)
+	return fs.navDriver.IsDir(path)
+}
+
+// Stat returns file or directory stats for a given path.
+func (fs *FileSystem) Stat(path string) (FileInfo, errors.Error) {
+	if !fs.canNavigate {
+		return nil, ErrNotSupported.Args("Stat").Make()
+	}
+
+	return fs.navDriver.Stat(path)
 }
 
 // ReadDir returns all files and directories contained in a directory.
@@ -241,7 +250,7 @@ func (fs *FileSystem) ReadDir(path string) ([]FileInfo, errors.Error) {
 		return nil, ErrNotSupported.Args("ReadDir").Make()
 	}
 
-	return fs.rDriver.ReadDir(path)
+	return fs.navDriver.ReadDir(path)
 }
 
 // EnterDirHandler is called by Walk before a directory is entered. If skipDir is set to true, the directory will not be visited.

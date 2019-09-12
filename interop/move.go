@@ -20,7 +20,7 @@ func Move(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string) er
 		return err
 	}
 	if isFile {
-		return MoveFile(fsSrc, src, fsDst, dst)
+		return moveFile(fsSrc, src, fsDst, dst)
 	}
 
 	isDir, err := fsSrc.IsDir(src)
@@ -28,7 +28,7 @@ func Move(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string) er
 		return err
 	}
 	if isDir {
-		return MoveDir(fsSrc, src, fsDst, dst)
+		return moveDir(fsSrc, src, fsDst, dst)
 	}
 
 	return fs.ErrNotExists.Args(src).Make()
@@ -43,7 +43,11 @@ func MoveFile(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string
 		return fs.ErrNotSupported.Msg("Destination file system does not support writing").Make()
 	}
 
-	if err := CopyFile(fsSrc, src, fsDst, dst); err != nil {
+	return moveFile(fsSrc, src, fsDst, dst)
+}
+
+func moveFile(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string) errors.Error {
+	if err := copyFile(fsSrc, src, fsDst, dst); err != nil {
 		return err
 	}
 
@@ -59,7 +63,11 @@ func MoveDir(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string)
 		return fs.ErrNotSupported.Msg("Destination file system does not support writing").Make()
 	}
 
-	if err := CopyDir(fsSrc, src, fsDst, dst); err != nil {
+	return moveDir(fsSrc, src, fsDst, dst)
+}
+
+func moveDir(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string) errors.Error {
+	if err := copyDir(fsSrc, src, fsDst, dst); err != nil {
 		return err
 	}
 
@@ -75,7 +83,7 @@ func MoveAll(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string)
 		return fs.ErrNotSupported.Msg("Destination file system does not support writing").Make()
 	}
 
-	if err := CopyAll(fsSrc, src, fsDst, dst); err != nil {
+	if err := copyAll(fsSrc, src, fsDst, dst); err != nil {
 		return err
 	}
 

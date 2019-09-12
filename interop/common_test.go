@@ -3,14 +3,37 @@ package interop
 import (
 	"testing"
 
-	"github.com/sbreitf1/errors"
 	"github.com/sbreitf1/fs"
+
+	"github.com/sbreitf1/errors"
 	"github.com/stretchr/testify/assert"
 )
 
 /* ############################################### */
 /* ###               Test Helper               ### */
 /* ############################################### */
+
+func prepareDir(t *testing.T, fs *fs.FileSystem) bool {
+	if !errors.AssertNil(t, fs.CreateDirectory("/foo")) {
+		return false
+	}
+	if !errors.AssertNil(t, fs.CreateDirectory("/foo/bar")) {
+		return false
+	}
+	if !errors.AssertNil(t, fs.CreateDirectory("/foo/test")) {
+		return false
+	}
+	if !errors.AssertNil(t, fs.CreateDirectory("/foo/bar/hello")) {
+		return false
+	}
+	if !errors.AssertNil(t, fs.WriteString("/foo/test.txt", "foo1")) {
+		return false
+	}
+	if !errors.AssertNil(t, fs.WriteString("/foo/bar/hello/blub.txt", "bar2")) {
+		return false
+	}
+	return true
+}
 
 func assertNotExists(t *testing.T, fs *fs.FileSystem, path string) bool {
 	exists, err := fs.Exists(path)

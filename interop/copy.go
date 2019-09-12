@@ -3,9 +3,8 @@ package interop
 import (
 	"io"
 
-	"github.com/sbreitf1/fs/path"
-
 	"github.com/sbreitf1/fs"
+	"github.com/sbreitf1/fs/path"
 
 	"github.com/sbreitf1/errors"
 )
@@ -24,7 +23,7 @@ func Copy(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string) er
 		return err
 	}
 	if isFile {
-		return CopyFile(fsSrc, src, fsDst, dst)
+		return copyFile(fsSrc, src, fsDst, dst)
 	}
 
 	isDir, err := fsSrc.IsDir(src)
@@ -32,7 +31,7 @@ func Copy(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string) er
 		return err
 	}
 	if isDir {
-		return CopyDir(fsSrc, src, fsDst, dst)
+		return copyDir(fsSrc, src, fsDst, dst)
 	}
 
 	return fs.ErrNotExists.Args(src).Make()
@@ -47,6 +46,10 @@ func CopyFile(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string
 		return fs.ErrNotSupported.Msg("Destination file system does not support writing").Make()
 	}
 
+	return copyFile(fsSrc, src, fsDst, dst)
+}
+
+func copyFile(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string) errors.Error {
 	fSrc, err := fsSrc.Open(src)
 	if err != nil {
 		return err
@@ -80,7 +83,22 @@ func CopyDir(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string)
 
 func copyDir(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string) errors.Error {
 	fsDst.CreateDirectory(dst)
+	return copyAll(fsSrc, src, fsDst, dst)
+}
 
+// CopyAll copies the content of a directory to another directory recursively.
+func CopyAll(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string) errors.Error {
+	if !fsSrc.CanRead() {
+		return fs.ErrNotSupported.Msg("Source file system does not support reading").Make()
+	}
+	if !fsDst.CanWrite() {
+		return fs.ErrNotSupported.Msg("Destination file system does not support writing").Make()
+	}
+
+	return copyAll(fsSrc, src, fsDst, dst)
+}
+
+func copyAll(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string) errors.Error {
 	files, err := fsSrc.ReadDir(src)
 	if err != nil {
 		return err
@@ -99,9 +117,4 @@ func copyDir(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string)
 	}
 
 	return nil
-}
-
-// CopyAll copies the content of a directory to another directory recursively.
-func CopyAll(fsSrc *fs.FileSystem, src string, fsDst *fs.FileSystem, dst string) errors.Error {
-	panic("CopyAll is not implemented")
 }

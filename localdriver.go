@@ -75,6 +75,23 @@ func (d *LocalDriver) IsDir(path string) (bool, errors.Error) {
 	return fi.IsDir(), nil
 }
 
+// Stat returns file or directory stats for a given path.
+func (d *LocalDriver) Stat(path string) (FileInfo, errors.Error) {
+	rootedPath, err := d.root(path)
+	if err != nil {
+		return nil, err
+	}
+
+	fi, statErr := os.Stat(rootedPath)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
+			return nil, ErrNotExists.Args(path).Make()
+		}
+		return nil, Err.Msg("Failed to access path %q", path).Make().Cause(statErr)
+	}
+	return fi, nil
+}
+
 // ReadDir returns all files and directories contained in a directory.
 func (d *LocalDriver) ReadDir(path string) ([]FileInfo, errors.Error) {
 	rootedPath, err := d.root(path)

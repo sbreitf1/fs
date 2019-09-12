@@ -32,18 +32,18 @@ func TestLocalDriverCommon(t *testing.T) {
 }
 
 func testLocalDriver(t *testing.T, driver *LocalDriver, rootDir, workingDir string) {
-	t.Run("ReadDirEmpty", func(t *testing.T) {
+	t.Run("TestReadDirEmpty", func(t *testing.T) {
 		files, err := driver.ReadDir(path.Join(workingDir, "/"))
 		errors.AssertNil(t, err)
 		assert.Equal(t, 0, len(files))
 	})
 
-	t.Run("ReadDirNonExistent", func(t *testing.T) {
+	t.Run("TestReadDirNonExistent", func(t *testing.T) {
 		_, err := driver.ReadDir(path.Join(workingDir, "/nonexistingpath"))
 		errors.Assert(t, ErrDirectoryNotExists, err)
 	})
 
-	t.Run("IsFile", func(t *testing.T) {
+	t.Run("TestIsFile", func(t *testing.T) {
 		if err := ioutil.WriteFile(path.Join(rootDir, workingDir, "/test.txt"), []byte("test data"), os.ModePerm); err != nil {
 			panic(err)
 		}
@@ -53,7 +53,7 @@ func testLocalDriver(t *testing.T, driver *LocalDriver, rootDir, workingDir stri
 		assert.True(t, isFile)
 	})
 
-	t.Run("OpenFile", func(t *testing.T) {
+	t.Run("TestOpenFile", func(t *testing.T) {
 		f, err := driver.OpenFile(path.Join(workingDir, "/test.txt"), OpenReadOnly)
 		defer f.Close()
 		errors.AssertNil(t, err)
@@ -63,7 +63,7 @@ func testLocalDriver(t *testing.T, driver *LocalDriver, rootDir, workingDir stri
 		assert.Equal(t, "test data", string(data))
 	})
 
-	t.Run("ReadDirSingleFile", func(t *testing.T) {
+	t.Run("TestReadDirSingleFile", func(t *testing.T) {
 		files, err := driver.ReadDir(path.Join(workingDir, "/"))
 		errors.AssertNil(t, err)
 		assert.Equal(t, 1, len(files))
@@ -71,14 +71,26 @@ func testLocalDriver(t *testing.T, driver *LocalDriver, rootDir, workingDir stri
 		assert.False(t, files[0].IsDir())
 	})
 
-	t.Run("CreateDir", func(t *testing.T) {
+	t.Run("TestStatNonExistent", func(t *testing.T) {
+		_, err := driver.Stat(path.Join(workingDir, "/newdir/and"))
+		errors.Assert(t, ErrNotExists, err)
+	})
+
+	t.Run("TestCreateDir", func(t *testing.T) {
 		errors.AssertNil(t, driver.CreateDirectory(path.Join(workingDir, "/newdir/and/subdir")))
 		assert.DirExists(t, path.Join(rootDir, workingDir, "/newdir"))
 		assert.DirExists(t, path.Join(rootDir, workingDir, "/newdir/and"))
 		assert.DirExists(t, path.Join(rootDir, workingDir, "/newdir/and/subdir"))
 	})
 
-	t.Run("CreateFile", func(t *testing.T) {
+	t.Run("TestStatDir", func(t *testing.T) {
+		fi, err := driver.Stat(path.Join(workingDir, "/newdir/and"))
+		errors.AssertNil(t, err)
+		assert.Equal(t, "and", fi.Name())
+		assert.True(t, fi.IsDir())
+	})
+
+	t.Run("TestCreateFile", func(t *testing.T) {
 		f, err := driver.OpenFile(path.Join(workingDir, "/newdir/and/subdir/testfile.txt"), OpenReadWrite.Create().Truncate())
 		errors.AssertNil(t, err)
 
@@ -91,7 +103,15 @@ func testLocalDriver(t *testing.T, driver *LocalDriver, rootDir, workingDir stri
 		assert.Equal(t, "some test data", string(data))
 	})
 
-	t.Run("MoveFile", func(t *testing.T) {
+	t.Run("TestStatFile", func(t *testing.T) {
+		fi, err := driver.Stat(path.Join(workingDir, "/newdir/and/subdir/testfile.txt"))
+		errors.AssertNil(t, err)
+		assert.Equal(t, "testfile.txt", fi.Name())
+		assert.False(t, fi.IsDir())
+		assert.Equal(t, int64(14), fi.Size())
+	})
+
+	t.Run("TestMoveFile", func(t *testing.T) {
 		driver.MoveFile(path.Join(workingDir, "/newdir/and/subdir/testfile.txt"), path.Join(workingDir, "/newdir/and/testfile.txt"))
 
 		_, err := os.Stat(path.Join(rootDir, workingDir, "/newdir/and/subdir/testfile.txt"))
@@ -103,7 +123,7 @@ func testLocalDriver(t *testing.T, driver *LocalDriver, rootDir, workingDir stri
 		assert.Equal(t, "some test data", string(data))
 	})
 
-	t.Run("MoveDir", func(t *testing.T) {
+	t.Run("TestMoveDir", func(t *testing.T) {
 		driver.MoveDir(path.Join(workingDir, "/newdir/and"), path.Join(workingDir, "/foo"))
 
 		_, err := os.Stat(path.Join(rootDir, workingDir, "/newdir/and"))
@@ -113,13 +133,13 @@ func testLocalDriver(t *testing.T, driver *LocalDriver, rootDir, workingDir stri
 		assert.DirExists(t, path.Join(rootDir, workingDir, "/foo/subdir"))
 	})
 
-	t.Run("DeleteFile", func(t *testing.T) {
+	t.Run("TestDeleteFile", func(t *testing.T) {
 		errors.AssertNil(t, driver.DeleteFile(path.Join(workingDir, "/foo/testfile.txt")))
 		_, err := os.Stat(path.Join(rootDir, workingDir, "/foo/testfile.txt"))
 		assert.True(t, os.IsNotExist(err))
 	})
 
-	t.Run("DeleteDir", func(t *testing.T) {
+	t.Run("TestDeleteDir", func(t *testing.T) {
 		errors.Assert(t, ErrNotEmpty, driver.DeleteDirectory(path.Join(workingDir, "/foo"), false))
 		assert.DirExists(t, path.Join(rootDir, workingDir, "/foo"))
 

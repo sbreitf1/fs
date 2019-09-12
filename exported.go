@@ -28,6 +28,11 @@ func IsDir(path string) (bool, errors.Error) {
 	return DefaultFileSystem.IsDir(path)
 }
 
+// Stat returns file or directory stats for a given path.
+func Stat(path string) (FileInfo, errors.Error) {
+	return DefaultFileSystem.Stat(path)
+}
+
 // ReadDir returns all files and directories contained in a directory.
 func ReadDir(path string) ([]FileInfo, errors.Error) {
 	return DefaultFileSystem.ReadDir(path)
