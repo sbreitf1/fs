@@ -9,7 +9,7 @@ import (
 
 const (
 	// DefaultPathDelimiter denotes the character used to separate directory and file names in paths.
-	DefaultPathDelimiter = "/"
+	DefaultPathDelimiter = filepath.Separator
 )
 
 var (

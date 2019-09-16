@@ -253,24 +253,30 @@ func (fs *FileSystem) ReadDir(path string) ([]FileInfo, errors.Error) {
 	return fs.navDriver.ReadDir(path)
 }
 
-// EnterDirHandler is called by Walk before a directory is entered. If skipDir is set to true, the directory will not be visited.
-type EnterDirHandler func(dir string, f FileInfo, skipDir *bool) errors.Error
+// VisitFileHandler is called by Walk for every file and directory that is found recursively.
+type VisitFileHandler func(dir string, f FileInfo, isRoot bool) errors.Error
 
-// VisitFileHandler is called by Walk for every file that is found recursively.
-type VisitFileHandler func(dir string, f FileInfo) errors.Error
+// EnterDirHandler is called by Walk before a directory is entered. If skipDir is set to true, the directory will not be visited.
+type EnterDirHandler func(dir string, f FileInfo, isRoot bool, skipDir *bool) errors.Error // bool isRootDir
 
 // LeaveDirHandler is called by Walk after all elements inside a directory have been processed.
-type LeaveDirHandler func(dir string, f FileInfo) errors.Error
+type LeaveDirHandler func(dir string, f FileInfo, isRoot bool) errors.Error
 
 // WalkOptions can be used to specify the behavior of Walk like visit order and search strategy.
 type WalkOptions struct {
 	// SkipSubDirs denotes whether the directory is traversed recursively or not.
 	SkipSubDirs bool
-
-	//TODO walk options
+	// VisitRootDir causes Walk to also call the visit handler for the walked directory itself.
+	VisitRootDir bool
+	// EnterLeaveCallbacksForRoot denotes whether the enter and leave callbacks are called for the walked directory itself.
+	EnterLeaveCallbacksForRoot bool
+	// VisitOrder denotes a function that is used to sort the sequence of files inside a single directory to specify in which order the sub-elements are processed.
+	VisitOrder FileInfoComparer
 }
 
 // Walk calls the corresponding callback functions for ever file and directory contained in dir recursively.
+//
+// The visit handler is called first for every file and directory that is found inside a directory. For directories, the enter dir handler is called subsequently. After this call, Walk instantly recurses into the given directory. Remaining files in the parent directory are visited after the corresponding leave callback. Leave callbacks are performed directly after the last element of a directory has been visited (and leaved in case of a sub-directory).
 func (fs *FileSystem) Walk(dir string, visitFileHandler VisitFileHandler, enterDirHandler EnterDirHandler, leaveDirHandler LeaveDirHandler, options *WalkOptions) errors.Error {
 	if !fs.canNavigate {
 		return ErrNotSupported.Args("Walk").Make()
@@ -280,7 +286,39 @@ func (fs *FileSystem) Walk(dir string, visitFileHandler VisitFileHandler, enterD
 		options = &WalkOptions{}
 	}
 
-	return fs.walk(dir, visitFileHandler, enterDirHandler, leaveDirHandler, options)
+	fi, err := fs.Stat(dir)
+	if err != nil {
+		return err
+	}
+
+	if options.VisitRootDir && visitFileHandler != nil {
+		if err := visitFileHandler(dir, fi, true); err != nil {
+			return err
+		}
+	}
+
+	if options.EnterLeaveCallbacksForRoot && enterDirHandler != nil {
+		skipDir := false
+		if err := enterDirHandler(dir, fi, true, &skipDir); err != nil {
+			return err
+		}
+		if skipDir {
+			// skip outermost directory -> do nothing
+			return nil
+		}
+	}
+
+	if err := fs.walk(dir, visitFileHandler, enterDirHandler, leaveDirHandler, options); err != nil {
+		return err
+	}
+
+	if options.EnterLeaveCallbacksForRoot && leaveDirHandler != nil {
+		if err := leaveDirHandler(dir, fi, true); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (fs *FileSystem) walk(dir string, visitFileHandler VisitFileHandler, enterDirHandler EnterDirHandler, leaveDirHandler LeaveDirHandler, options *WalkOptions) errors.Error {
@@ -289,9 +327,13 @@ func (fs *FileSystem) walk(dir string, visitFileHandler VisitFileHandler, enterD
 		return err
 	}
 
+	if options.VisitOrder != nil {
+		Sort(files, options.VisitOrder)
+	}
+
 	for _, f := range files {
 		if visitFileHandler != nil {
-			if err := visitFileHandler(dir, f); err != nil {
+			if err := visitFileHandler(dir, f, false); err != nil {
 				return err
 			}
 		}
@@ -299,7 +341,7 @@ func (fs *FileSystem) walk(dir string, visitFileHandler VisitFileHandler, enterD
 		if !options.SkipSubDirs && f.IsDir() {
 			if enterDirHandler != nil {
 				skipDir := false
-				if err := enterDirHandler(dir, f, &skipDir); err != nil {
+				if err := enterDirHandler(dir, f, false, &skipDir); err != nil {
 					return err
 				}
 				if skipDir {
@@ -312,7 +354,7 @@ func (fs *FileSystem) walk(dir string, visitFileHandler VisitFileHandler, enterD
 			}
 
 			if leaveDirHandler != nil {
-				if err := leaveDirHandler(dir, f); err != nil {
+				if err := leaveDirHandler(dir, f, false); err != nil {
 					return err
 				}
 			}

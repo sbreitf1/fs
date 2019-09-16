@@ -38,6 +38,13 @@ func ReadDir(path string) ([]FileInfo, errors.Error) {
 	return DefaultFileSystem.ReadDir(path)
 }
 
+// Walk calls the corresponding callback functions for ever file and directory contained in dir recursively.
+//
+// The visit handler is called first for every file and directory that is found inside a directory. For directories, the enter dir handler is called subsequently. After this call, Walk instantly recurses into the given directory. Remaining files in the parent directory are visited after the corresponding leave callback. Leave callbacks are performed directly after the last element of a directory has been visited (and leaved in case of a sub-directory).
+func Walk(dir string, visitFileHandler VisitFileHandler, enterDirHandler EnterDirHandler, leaveDirHandler LeaveDirHandler, options *WalkOptions) errors.Error {
+	return DefaultFileSystem.Walk(dir, visitFileHandler, enterDirHandler, leaveDirHandler, options)
+}
+
 // Open opens a file instance for reading and returns the handle.
 func Open(path string) (File, errors.Error) {
 	return DefaultFileSystem.Open(path)

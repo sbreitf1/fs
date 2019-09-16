@@ -46,6 +46,13 @@ func TestFileSystemCommon(t *testing.T) {
 }
 
 func testFS(t *testing.T, fs *FileSystem, dir string) {
+	t.Run("TestStatRoot", func(t *testing.T) {
+		fi, err := fs.Stat("/")
+		errors.AssertNil(t, err)
+		assert.Equal(t, "/", fi.Name())
+		assert.True(t, fi.IsDir())
+	})
+
 	t.Run("TestReadString", func(t *testing.T) {
 		path := path.Join(dir, "test.txt")
 		if err := ioutil.WriteFile(path, []byte("a new cool file content"), os.ModePerm); err != nil {
@@ -164,6 +171,14 @@ func testFS(t *testing.T, fs *FileSystem, dir string) {
 		assertWalk(t, fs, path.Join(dir, "foo"), nil, []string{"bar", "test.txt"}, []string{"bar"}, []string{"bar"})
 	})
 
+	t.Run("TestWalkVisitRoot", func(t *testing.T) {
+		assertWalk(t, fs, path.Join(dir, "foo"), &WalkOptions{VisitRootDir: true}, []string{"foo", "bar", "test.txt"}, []string{"bar"}, []string{"bar"})
+	})
+
+	t.Run("TestWalkRootCallback", func(t *testing.T) {
+		assertWalk(t, fs, path.Join(dir, "foo"), &WalkOptions{EnterLeaveCallbacksForRoot: true}, []string{"bar", "test.txt"}, []string{"foo", "bar"}, []string{"bar", "foo"})
+	})
+
 	t.Run("TestWalkFlat", func(t *testing.T) {
 		assertWalk(t, fs, path.Join(dir, "foo"), &WalkOptions{SkipSubDirs: true}, []string{"bar"}, []string{}, []string{})
 	})
@@ -171,7 +186,7 @@ func testFS(t *testing.T, fs *FileSystem, dir string) {
 	t.Run("TestWalkError", func(t *testing.T) {
 		errTest := errors.New("TestError")
 
-		errors.Assert(t, errTest, fs.Walk(path.Join(dir, "foo"), func(dir string, f FileInfo) errors.Error {
+		errors.Assert(t, errTest, fs.Walk(path.Join(dir, "foo"), func(dir string, f FileInfo, isRoot bool) errors.Error {
 			if f.Name() == "test.txt" {
 				// wait for inner directory to also test recursive error passing
 				return errTest.Make()
@@ -179,11 +194,11 @@ func testFS(t *testing.T, fs *FileSystem, dir string) {
 			return nil
 		}, nil, nil, nil))
 
-		errors.Assert(t, errTest, fs.Walk(path.Join(dir, "foo"), nil, func(dir string, f FileInfo, skipDir *bool) errors.Error {
+		errors.Assert(t, errTest, fs.Walk(path.Join(dir, "foo"), nil, func(dir string, f FileInfo, isRoot bool, skipDir *bool) errors.Error {
 			return errTest.Make()
 		}, nil, nil))
 
-		errors.Assert(t, errTest, fs.Walk(path.Join(dir, "foo"), nil, nil, func(dir string, f FileInfo) errors.Error {
+		errors.Assert(t, errTest, fs.Walk(path.Join(dir, "foo"), nil, nil, func(dir string, f FileInfo, isRoot bool) errors.Error {
 			return errTest.Make()
 		}, nil))
 	})
@@ -191,11 +206,11 @@ func testFS(t *testing.T, fs *FileSystem, dir string) {
 	t.Run("TestWalkSkipDir", func(t *testing.T) {
 		visitCount := 0
 		visitExpected := []string{"bar"}
-		errors.AssertNil(t, fs.Walk(path.Join(dir, "foo"), func(dir string, f FileInfo) errors.Error {
+		errors.AssertNil(t, fs.Walk(path.Join(dir, "foo"), func(dir string, f FileInfo, isRoot bool) errors.Error {
 			assert.Equal(t, visitExpected[visitCount], f.Name())
 			visitCount++
 			return nil
-		}, func(dir string, f FileInfo, skipDir *bool) errors.Error {
+		}, func(dir string, f FileInfo, isRoot bool, skipDir *bool) errors.Error {
 			*skipDir = true
 			return nil
 		}, nil, nil))
@@ -242,7 +257,7 @@ func testFS(t *testing.T, fs *FileSystem, dir string) {
 		dirCount := 0
 		fileCount := 0
 		size := int64(0)
-		errors.AssertNil(t, fs.Walk(path.Join(dir, "asdf"), func(dir string, f FileInfo) errors.Error {
+		errors.AssertNil(t, fs.Walk(path.Join(dir, "asdf"), func(dir string, f FileInfo, isRoot bool) errors.Error {
 			if f.IsDir() {
 				dirCount++
 			} else {
@@ -254,6 +269,33 @@ func testFS(t *testing.T, fs *FileSystem, dir string) {
 		assert.Equal(t, 2, dirCount)
 		assert.Equal(t, 3, fileCount)
 		assert.Equal(t, int64(21), size)
+	})
+
+	t.Run("TestWalkFilesFirst", func(t *testing.T) {
+		errors.AssertNil(t, fs.CreateDirectory(path.Join(dir, "foo2")))
+		errors.AssertNil(t, fs.CreateDirectory(path.Join(dir, "foo2/bar")))
+		errors.AssertNil(t, fs.WriteString(path.Join(dir, "foo2/test.txt"), "foo bar"))
+		assertWalk(t, fs, path.Join(dir, "foo2"), &WalkOptions{VisitOrder: OrderFilesFirst}, []string{"test.txt", "bar"}, []string{"bar"}, []string{"bar"})
+	})
+
+	t.Run("TestWalkDirectoriesFirst", func(t *testing.T) {
+		assertWalk(t, fs, path.Join(dir, "foo2"), &WalkOptions{VisitOrder: OrderDirectoriesFirst}, []string{"bar", "test.txt"}, []string{"bar"}, []string{"bar"})
+	})
+
+	t.Run("TestWalkLexicographicAsc", func(t *testing.T) {
+		errors.AssertNil(t, fs.CreateDirectory(path.Join(dir, "foo2/cool")))
+		errors.AssertNil(t, fs.CreateDirectory(path.Join(dir, "foo2/cool/sub")))
+		errors.AssertNil(t, fs.CreateDirectory(path.Join(dir, "foo2/stuff")))
+		errors.AssertNil(t, fs.WriteString(path.Join(dir, "foo2/better stuff.txt"), "foo bar"))
+		assertWalk(t, fs, path.Join(dir, "foo2"), &WalkOptions{VisitOrder: OrderLexicographicAsc}, []string{"bar", "better stuff.txt", "cool", "sub", "stuff", "test.txt"}, []string{"bar", "cool", "sub", "stuff"}, []string{"bar", "sub", "cool", "stuff"})
+	})
+
+	t.Run("TestWalkLexicographicDesc", func(t *testing.T) {
+		assertWalk(t, fs, path.Join(dir, "foo2"), &WalkOptions{VisitOrder: OrderLexicographicDesc}, []string{"test.txt", "stuff", "cool", "sub", "better stuff.txt", "bar"}, []string{"stuff", "cool", "sub", "bar"}, []string{"stuff", "sub", "cool", "bar"})
+	})
+
+	t.Run("TestWalkCompound", func(t *testing.T) {
+		assertWalk(t, fs, path.Join(dir, "foo2"), &WalkOptions{VisitOrder: NewCompoundComparer(OrderFilesFirst, OrderLexicographicAsc)}, []string{"better stuff.txt", "test.txt", "bar", "cool", "sub", "stuff"}, []string{"bar", "cool", "sub", "stuff"}, []string{"bar", "sub", "cool", "stuff"})
 	})
 }
 
@@ -294,24 +336,61 @@ func assertFileContent(t *testing.T, fs *FileSystem, path, expectedContent strin
 }
 
 func assertWalk(t *testing.T, fs *FileSystem, path string, options *WalkOptions, visitExpected, enterExpected, leaveExpected []string) bool {
+	visitRoot := false
+	if options != nil && options.VisitRootDir {
+		visitRoot = true
+	}
+
+	rootCallback := false
+	if options != nil && options.EnterLeaveCallbacksForRoot {
+		rootCallback = true
+	}
+
 	errAssertionFailed := errors.New("AssertionFailed")
 	visitCount := 0
 	enterCount := 0
 	leaveCount := 0
-	err := fs.Walk(path, func(dir string, f FileInfo) errors.Error {
-		if !assert.Equal(t, visitExpected[visitCount], f.Name()) {
+	err := fs.Walk(path, func(dir string, f FileInfo, isRoot bool) errors.Error {
+		if visitRoot && visitCount == 0 {
+			if !assert.True(t, isRoot) {
+				return errAssertionFailed.Make()
+			}
+		} else {
+			if !assert.False(t, isRoot) {
+				return errAssertionFailed.Make()
+			}
+		}
+		if visitCount < len(visitExpected) && !assert.Equal(t, visitExpected[visitCount], f.Name()) {
 			return errAssertionFailed.Make()
 		}
 		visitCount++
 		return nil
-	}, func(dir string, f FileInfo, skipDir *bool) errors.Error {
-		if !assert.Equal(t, enterExpected[enterCount], f.Name()) {
+	}, func(dir string, f FileInfo, isRoot bool, skipDir *bool) errors.Error {
+		if rootCallback && enterCount == 0 {
+			if !assert.True(t, isRoot) {
+				return errAssertionFailed.Make()
+			}
+		} else {
+			if !assert.False(t, isRoot) {
+				return errAssertionFailed.Make()
+			}
+		}
+		if enterCount < len(enterExpected) && !assert.Equal(t, enterExpected[enterCount], f.Name()) {
 			return errAssertionFailed.Make()
 		}
 		enterCount++
 		return nil
-	}, func(dir string, f FileInfo) errors.Error {
-		if !assert.Equal(t, leaveExpected[leaveCount], f.Name()) {
+	}, func(dir string, f FileInfo, isRoot bool) errors.Error {
+		if rootCallback && leaveCount == (len(leaveExpected)-1) {
+			if !assert.True(t, isRoot) {
+				return errAssertionFailed.Make()
+			}
+		} else {
+			if !assert.False(t, isRoot) {
+				return errAssertionFailed.Make()
+			}
+		}
+		if leaveCount < len(leaveExpected) && !assert.Equal(t, leaveExpected[leaveCount], f.Name()) {
 			return errAssertionFailed.Make()
 		}
 		leaveCount++
