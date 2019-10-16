@@ -89,6 +89,7 @@ type File interface {
 	io.Reader
 	io.Writer
 	io.Closer
+	io.Seeker
 }
 
 // OpenFlags specifies information on how to open a file.
